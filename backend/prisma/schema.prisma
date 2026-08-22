@@ -1,0 +1,178 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ORGANISER
+  ADMIN
+}
+
+enum EventType {
+  MOVIE
+  CONCERT
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED
+  EXPIRED
+  FULFILLED
+  CANCELLED
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  password      String
+  name          String
+  role          Role       @default(CUSTOMER)
+  createdAt     DateTime   @default(now())
+  venues        Venue[]    @relation("AdminVenues")
+  events        Event[]    @relation("OrganiserEvents")
+  bookings      Booking[]
+  waitlists     Waitlist[]
+  seatHolds     SeatHold[]
+}
+
+model Venue {
+  id        String   @id @default(uuid())
+  name      String
+  address   String
+  admin     User     @relation("AdminVenues", fields: [adminId], references: [id])
+  adminId   String
+  seats     Seat[]
+  events    Event[]
+  createdAt DateTime @default(now())
+}
+
+// Fixed physical seat layout for a venue
+model Seat {
+  id         String      @id @default(uuid())
+  venue      Venue       @relation(fields: [venueId], references: [id])
+  venueId    String
+  row        String
+  column     Int
+  label      String // e.g. "A1"
+  category   String // e.g. "Premium", "Standard"
+  showSeats  ShowSeat[]
+
+  @@unique([venueId, row, column])
+  @@index([venueId, category])
+}
+
+// An Event represents a specific show/screening/concert instance
+model Event {
+  id          String              @id @default(uuid())
+  title       String
+  type        EventType
+  organiser   User                @relation("OrganiserEvents", fields: [organiserId], references: [id])
+  organiserId String
+  venue       Venue               @relation(fields: [venueId], references: [id])
+  venueId     String
+  date        DateTime
+  startTime   String
+  createdAt   DateTime            @default(now())
+  pricing     EventCategoryPrice[]
+  showSeats   ShowSeat[]
+  bookings    Booking[]
+  waitlists   Waitlist[]
+}
+
+model EventCategoryPrice {
+  id       String @id @default(uuid())
+  event    Event  @relation(fields: [eventId], references: [id])
+  eventId  String
+  category String
+  price    Decimal @db.Decimal(10, 2)
+
+  @@unique([eventId, category])
+}
+
+// Per-show seat status (one row per Seat per Event)
+model ShowSeat {
+  id            String        @id @default(uuid())
+  event         Event         @relation(fields: [eventId], references: [id])
+  eventId       String
+  seat          Seat          @relation(fields: [seatId], references: [id])
+  seatId        String
+  status        SeatStatus    @default(AVAILABLE)
+  version       Int           @default(0) // optimistic concurrency guard
+  heldUntil     DateTime?
+  seatHold      SeatHold?
+  bookingSeat   BookingSeat?
+
+  @@unique([eventId, seatId])
+  @@index([eventId, status])
+}
+
+model SeatHold {
+  id          String   @id @default(uuid())
+  showSeat    ShowSeat @relation(fields: [showSeatId], references: [id])
+  showSeatId  String   @unique
+  customer    User     @relation(fields: [customerId], references: [id])
+  customerId  String
+  sessionId   String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  bookingRef    String        @unique
+  event         Event         @relation(fields: [eventId], references: [id])
+  eventId       String
+  customer      User          @relation(fields: [customerId], references: [id])
+  customerId    String
+  status        BookingStatus @default(CONFIRMED)
+  totalAmount   Decimal       @db.Decimal(10, 2)
+  qrCodeData    String?
+  seats         BookingSeat[]
+  createdAt     DateTime      @default(now())
+  cancelledAt   DateTime?
+}
+
+model BookingSeat {
+  id          String   @id @default(uuid())
+  booking     Booking  @relation(fields: [bookingId], references: [id])
+  bookingId   String
+  showSeat    ShowSeat @relation(fields: [showSeatId], references: [id])
+  showSeatId  String   @unique
+  category    String
+  price       Decimal  @db.Decimal(10, 2)
+}
+
+model Waitlist {
+  id              String         @id @default(uuid())
+  event           Event          @relation(fields: [eventId], references: [id])
+  eventId         String
+  category        String
+  customer        User           @relation(fields: [customerId], references: [id])
+  customerId      String
+  status          WaitlistStatus @default(WAITING)
+  offeredShowSeatId String?
+  offerExpiresAt  DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([eventId, category, status, createdAt])
+}
