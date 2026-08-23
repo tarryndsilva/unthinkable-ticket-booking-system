@@ -1,45 +1,72 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Button } from './ui/Button';
 
 export function NavBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const navLink = (to: string, label: string) => {
+    const active = location.pathname === to;
+    return (
+      <Link
+        to={to}
+        className={`relative px-3 py-2 text-sm font-medium transition-colors ${
+          active ? 'text-white' : 'text-canvas-300 hover:text-white'
+        }`}
+      >
+        {label}
+        {active && (
+          <span className="absolute inset-x-3 -bottom-[1px] h-px bg-gradient-to-r from-brand-400 to-electric-400" />
+        )}
+      </Link>
+    );
+  };
 
   return (
-    <nav className="bg-slate-900 text-white px-6 py-3 flex items-center justify-between">
-      <Link to="/" className="font-bold text-lg">🎟️ TicketHub</Link>
-      <div className="flex items-center gap-4 text-sm">
-        <Link to="/" className="hover:text-slate-300">Events</Link>
-        {user && (
-          <Link to="/bookings" className="hover:text-slate-300">My Bookings</Link>
-        )}
-        {user && (user.role === 'ORGANISER' || user.role === 'ADMIN') && (
-          <Link to="/organiser" className="hover:text-slate-300">Organiser</Link>
-        )}
-        {user && user.role === 'ADMIN' && (
-          <Link to="/admin" className="hover:text-slate-300">Admin</Link>
-        )}
-        {user ? (
-          <>
-            <span className="text-slate-400">Hi, {user.name}</span>
-            <button
-              onClick={() => {
-                logout();
-                navigate('/login');
-              }}
-              className="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded"
-            >
-              Logout
-            </button>
-          </>
-        ) : (
-          <>
-            <Link to="/login" className="hover:text-slate-300">Login</Link>
-            <Link to="/register" className="bg-indigo-600 hover:bg-indigo-500 px-3 py-1 rounded">
-              Sign up
-            </Link>
-          </>
-        )}
+    <nav className="sticky top-0 z-40 border-b border-canvas-800/80 bg-canvas-950/75 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3.5">
+        <Link to="/" className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-brand-400 to-electric-500 text-sm font-bold text-white shadow-[var(--shadow-glow-brand)]">
+            T
+          </span>
+          <span className="font-display text-lg italic text-canvas-50">TicketHub</span>
+        </Link>
+
+        <div className="hidden items-center gap-1 sm:flex">
+          {navLink('/', 'Browse')}
+          {user && navLink('/bookings', 'My tickets')}
+          {user && (user.role === 'ORGANISER' || user.role === 'ADMIN') && navLink('/organiser', 'Organiser')}
+          {user && user.role === 'ADMIN' && navLink('/admin', 'Admin')}
+        </div>
+
+        <div className="flex items-center gap-3">
+          {user ? (
+            <>
+              <span className="hidden text-sm text-canvas-400 sm:inline">Hi, {user.name.split(' ')[0]}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                Log out
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => navigate('/login')}>
+                Log in
+              </Button>
+              <Button variant="primary" size="sm" onClick={() => navigate('/register')}>
+                Sign up
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </nav>
   );

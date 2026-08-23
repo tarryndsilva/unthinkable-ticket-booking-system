@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { apiErrorMessage } from '../api/client';
+import { Card } from '../components/ui/Card';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -26,33 +29,31 @@ export function LoginPage() {
   }
 
   return (
-    <div className="max-w-sm mx-auto mt-16 p-6 bg-white rounded-lg shadow">
-      <h1 className="text-xl font-semibold mb-4">Log in</h1>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          required
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="w-full border rounded px-3 py-2"
-          required
-        />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button disabled={busy} className="w-full bg-indigo-600 text-white rounded py-2 disabled:opacity-50">
-          {busy ? 'Logging in...' : 'Log in'}
-        </button>
-      </form>
-      <p className="text-sm mt-4 text-slate-600">
-        No account? <Link to="/register" className="text-indigo-600">Sign up</Link>
-      </p>
+    <div className="relative flex min-h-[calc(100vh-64px)] items-center justify-center overflow-hidden bg-canvas-950 px-6">
+      <div className="pointer-events-none absolute -top-24 left-1/2 h-96 w-[700px] -translate-x-1/2 rounded-full bg-brand-600/20 blur-[120px]" />
+      <Card variant="glass" glow="brand" className="relative w-full max-w-sm animate-[scale-in_0.2s_cubic-bezier(0.16,1,0.3,1)] p-8">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-electric-500 text-base font-bold text-white shadow-[var(--shadow-glow-brand)]">
+          T
+        </span>
+        <h1 className="mt-5 font-display text-2xl italic text-canvas-50">Welcome back</h1>
+        <p className="mt-1 text-sm text-canvas-400">Log in to manage your bookings.</p>
+
+        <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+          <Input type="email" label="Email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <Input type="password" label="Password" placeholder="\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          {error && <p className="text-sm text-ruby-400">{error}</p>}
+          <Button type="submit" variant="primary" size="lg" className="w-full" loading={busy}>
+            Log in
+          </Button>
+        </form>
+
+        <p className="mt-6 text-center text-sm text-canvas-400">
+          No account?{' '}
+          <Link to="/register" className="font-medium text-brand-300 hover:text-brand-200">
+            Sign up
+          </Link>
+        </p>
+      </Card>
     </div>
   );
 }

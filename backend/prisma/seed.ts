@@ -3,6 +3,72 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+function makeSeats(rows: string[], seatsPerRow: number, premiumRows: string[]) {
+  const seats = [];
+  for (const row of rows) {
+    for (let col = 1; col <= seatsPerRow; col++) {
+      seats.push({
+        row,
+        column: col,
+        label: `${row}${col}`,
+        category: premiumRows.includes(row) ? 'Premium' : 'Standard',
+      });
+    }
+  }
+  return seats;
+}
+
+async function ensureVenue(name: string, address: string, adminId: string, rows: string[], seatsPerRow: number, premiumRows: string[]) {
+  const existing = await prisma.venue.findFirst({ where: { name } });
+  if (existing) return prisma.venue.findUnique({ where: { id: existing.id }, include: { seats: true } });
+  return prisma.venue.create({
+    data: {
+      name,
+      address,
+      adminId,
+      seats: { create: makeSeats(rows, seatsPerRow, premiumRows) },
+    },
+    include: { seats: true },
+  });
+}
+
+async function ensureEvent(
+  title: string,
+  type: 'MOVIE' | 'CONCERT',
+  venue: { id: string; seats: { id: string; category: string }[] },
+  organiserId: string,
+  daysFromNow: number,
+  startTime: string,
+  premiumPrice: number,
+  standardPrice: number
+) {
+  const existing = await prisma.event.findFirst({ where: { title } });
+  if (existing) return;
+
+  const event = await prisma.event.create({
+    data: {
+      title,
+      type,
+      venueId: venue.id,
+      organiserId,
+      date: new Date(Date.now() + daysFromNow * 24 * 60 * 60 * 1000),
+      startTime,
+      pricing: {
+        create: [
+          { category: 'Premium', price: premiumPrice },
+          { category: 'Standard', price: standardPrice },
+        ],
+      },
+    },
+  });
+
+  await prisma.showSeat.createMany({
+    data: venue.seats.map((seat) => ({ eventId: event.id, seatId: seat.id })),
+  });
+
+  console.log(`Seeded event "${title}" (${venue.seats.length} seats)`);
+}
+
 async function main() {
   const password = await bcrypt.hash('password123', 10);
 
@@ -24,64 +90,54 @@ async function main() {
     create: { name: 'Jane Customer', email: 'customer@example.com', password, role: 'CUSTOMER' },
   });
 
-  const existingVenue = await prisma.venue.findFirst({ where: { name: 'Grand Cinema Hall' } });
-  const venue =
-    existingVenue ||
-    (await prisma.venue.create({
-      data: {
-        name: 'Grand Cinema Hall',
-        address: '123 Main Street, Chennai',
-        adminId: admin.id,
-        seats: {
-          create: (() => {
-            const seats = [];
-            const rows = ['A', 'B', 'C', 'D'];
-            for (const row of rows) {
-              for (let col = 1; col <= 8; col++) {
-                seats.push({
-                  row,
-                  column: col,
-                  label: `${row}${col}`,
-                  category: row === 'A' || row === 'B' ? 'Premium' : 'Standard',
-                });
-              }
-            }
-            return seats;
-          })(),
-        },
-      },
-      include: { seats: true },
-    }));
+  const cinemaHall = await ensureVenue(
+    'Grand Cinema Hall',
+    '123 Main Street, Chennai',
+    admin.id,
+    ['A', 'B', 'C', 'D', 'E', 'F'],
+    10,
+    ['A', 'B']
+  );
 
-  const venueWithSeats = await prisma.venue.findUnique({ where: { id: venue.id }, include: { seats: true } });
+  const arena = await ensureVenue(
+    'Skyline Arena',
+    '88 Riverside Boulevard, Chennai',
+    admin.id,
+    ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+    12,
+    ['A', 'B', 'C']
+  );
 
-  const existingEvent = await prisma.event.findFirst({ where: { title: 'Inception - IMAX Screening' } });
-  if (!existingEvent && venueWithSeats) {
-    const event = await prisma.event.create({
-      data: {
-        title: 'Inception - IMAX Screening',
-        type: 'MOVIE',
-        venueId: venue.id,
-        organiserId: organiser.id,
-        date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        startTime: '19:30',
-        pricing: {
-          create: [
-            { category: 'Premium', price: 15.0 },
-            { category: 'Standard', price: 10.0 },
-          ],
-        },
-      },
-    });
+  const jazzClub = await ensureVenue(
+    'The Blue Room Jazz Club',
+    '17 Harbor Lane, Chennai',
+    admin.id,
+    ['A', 'B', 'C', 'D'],
+    8,
+    ['A']
+  );
 
-    await prisma.showSeat.createMany({
-      data: venueWithSeats.seats.map((seat) => ({ eventId: event.id, seatId: seat.id })),
-    });
-
-    console.log(`Seeded event ${event.id} with ${venueWithSeats.seats.length} seats`);
+  if (cinemaHall) {
+    await ensureEvent('Inception \u2014 IMAX Screening', 'MOVIE', cinemaHall, organiser.id, 7, '19:30', 15, 10);
+    await ensureEvent('Dune: Part Two \u2014 Late Show', 'MOVIE', cinemaHall, organiser.id, 3, '22:00', 16, 11);
+    await ensureEvent('Spirited Away \u2014 Anniversary Screening', 'MOVIE', cinemaHall, organiser.id, 12, '17:00', 14, 9);
+    await ensureEvent('The Grand Budapest Hotel \u2014 Director\u2019s Cut', 'MOVIE', cinemaHall, organiser.id, 20, '20:15', 14, 9);
   }
 
-  console.log('Seed complete. Login with admin@example.com / organiser@example.com / customer@example.com, password: password123');
+  if (arena) {
+    await ensureEvent('Neon Skyline World Tour', 'CONCERT', arena, organiser.id, 14, '20:00', 85, 45);
+    await ensureEvent('Midnight Echoes Live', 'CONCERT', arena, organiser.id, 30, '19:00', 70, 38);
+    await ensureEvent('Symphony Under the Stars', 'CONCERT', arena, organiser.id, 45, '18:30', 60, 32);
+  }
+
+  if (jazzClub) {
+    await ensureEvent('Blue Note Sessions: Live Trio', 'CONCERT', jazzClub, organiser.id, 5, '21:00', 40, 25);
+    await ensureEvent('Late Night Sax & Soul', 'CONCERT', jazzClub, organiser.id, 9, '21:30', 42, 26);
+  }
+
+  console.log('\nSeed complete.');
+  console.log('Login: admin@example.com / organiser@example.com / customer@example.com');
+  console.log('Password: password123');
 }
 
 main()

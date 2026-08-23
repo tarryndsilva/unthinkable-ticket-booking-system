@@ -50,13 +50,42 @@ export interface SeatMapEntry {
   heldUntil: string | null;
 }
 
-export interface Booking {
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  createdAt: string;
+}
+
+export interface ModerationEvent {
+  id: string;
+  title: string;
+  type: 'MOVIE' | 'CONCERT';
+  date: string;
+  startTime: string;
+  venue: Venue;
+  organiser: { id: string; name: string; email: string };
+  _count: { showSeats: number; bookings: number };
+}
+
+export interface OrganiserBooking {
   id: string;
   bookingRef: string;
   status: 'CONFIRMED' | 'CANCELLED';
   totalAmount: string | number;
+  createdAt: string;
+  customer: { id: string; name: string; email: string };
+  seats: { category: string; price: string | number; showSeat: { seat: Seat } }[];
+}
+
+export interface Booking {
+  id: string;
+  bookingRef: string;
+  status: 'CONFIRMED' | 'CANCELLED';
   qrCodeData: string | null;
   createdAt: string;
+  totalAmount: string | number;
   event: EventItem;
   seats: { category: string; price: string | number; showSeat: { seat: Seat } }[];
 }

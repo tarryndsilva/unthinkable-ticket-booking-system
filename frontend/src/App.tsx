@@ -6,6 +6,9 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { EventsPage } from './pages/EventsPage';
 import { EventDetailPage } from './pages/EventDetailPage';
+import { CheckoutPage } from './pages/CheckoutPage';
+import { BookingSuccessPage } from './pages/BookingSuccessPage';
+import { TicketPage } from './pages/TicketPage';
 import { MyBookingsPage } from './pages/MyBookingsPage';
 import { OrganiserPage } from './pages/OrganiserPage';
 import { AdminPage } from './pages/AdminPage';
@@ -14,7 +17,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-canvas-950">
           <NavBar />
           <Routes>
             <Route path="/" element={<EventsPage />} />
@@ -22,10 +25,34 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/events/:id" element={<EventDetailPage />} />
             <Route
+              path="/checkout"
+              element={
+                <ProtectedRoute roles={['CUSTOMER']}>
+                  <CheckoutPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/booking-success"
+              element={
+                <ProtectedRoute roles={['CUSTOMER']}>
+                  <BookingSuccessPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/bookings"
               element={
                 <ProtectedRoute roles={['CUSTOMER']}>
                   <MyBookingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bookings/:id"
+              element={
+                <ProtectedRoute roles={['CUSTOMER']}>
+                  <TicketPage />
                 </ProtectedRoute>
               }
             />

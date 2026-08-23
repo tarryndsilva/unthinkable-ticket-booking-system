@@ -1,15 +1,27 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api, apiErrorMessage } from '../api/client';
 import type { Booking, WaitlistEntry } from '../types';
+import { Ticket } from '../components/ui/Ticket';
+import { Card } from '../components/ui/Card';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { SkeletonCard } from '../components/ui/Skeleton';
 
 export function MyBookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   function refresh() {
-    api.get('/api/bookings').then((res) => setBookings(res.data));
-    api.get('/api/bookings/waitlist/mine').then((res) => setWaitlist(res.data));
+    setLoading(true);
+    Promise.all([api.get('/api/bookings'), api.get('/api/bookings/waitlist/mine')])
+      .then(([b, w]) => {
+        setBookings(b.data);
+        setWaitlist(w.data);
+      })
+      .finally(() => setLoading(false));
   }
 
   useEffect(refresh, []);
@@ -40,84 +52,88 @@ export function MyBookingsPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">My Bookings</h1>
-      {error && <p className="text-red-600 text-sm mb-3">{error}</p>}
+    <div className="min-h-[calc(100vh-64px)] bg-canvas-950">
+      <div className="mx-auto max-w-3xl px-6 py-12">
+        <h1 className="font-display text-3xl italic text-canvas-50">My tickets</h1>
+        <p className="mt-1 text-sm text-canvas-400">Your bookings and waitlist status, all in one place.</p>
+        {error && <p className="mt-4 text-sm text-ruby-400">{error}</p>}
 
-      <div className="space-y-4">
-        {bookings.length === 0 && <p className="text-slate-500">No bookings yet.</p>}
-        {bookings.map((b) => (
-          <div key={b.id} className="bg-white rounded-lg shadow border p-4 flex gap-4">
-            {b.qrCodeData && <img src={b.qrCodeData} alt="QR ticket" className="w-24 h-24" />}
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h2 className="font-semibold">{b.event.title}</h2>
-                  <p className="text-sm text-slate-600">
-                    {b.event.venue.name} · {new Date(b.event.date).toDateString()} · {b.event.startTime}
-                  </p>
-                </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded ${
-                    b.status === 'CONFIRMED' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
-                  }`}
-                >
-                  {b.status}
-                </span>
-              </div>
-              <p className="text-sm mt-1">
-                Ref: <span className="font-mono">{b.bookingRef}</span> · Seats:{' '}
-                {b.seats.map((s) => s.showSeat.seat.label).join(', ')}
-              </p>
-              <p className="text-sm">Total: ${Number(b.totalAmount).toFixed(2)}</p>
-              {b.status === 'CONFIRMED' && (
-                <button onClick={() => handleCancel(b.id)} className="mt-2 text-sm text-red-600 hover:underline">
-                  Cancel booking
-                </button>
+        {loading ? (
+          <div className="mt-8 space-y-4">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        ) : (
+          <>
+            <div className="mt-8 space-y-4">
+              {bookings.length === 0 && (
+                <Card variant="outline" className="p-8 text-center text-sm text-canvas-400">
+                  No bookings yet &mdash; go find something to see.
+                </Card>
               )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {waitlist.length > 0 && (
-        <>
-          <h2 className="text-xl font-bold mt-8 mb-3">My Waitlist</h2>
-          <div className="space-y-3">
-            {waitlist.map((w) => (
-              <div key={w.id} className="bg-white rounded-lg shadow border p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="font-medium">{w.event.title}</p>
-                    <p className="text-sm text-slate-600">{w.category} category</p>
-                  </div>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      w.status === 'OFFERED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {w.status}
-                  </span>
-                </div>
-                {w.status === 'OFFERED' && w.offerExpiresAt && (
-                  <div className="mt-2">
-                    <p className="text-xs text-amber-700">
-                      A seat is available for you — complete checkout before{' '}
-                      {new Date(w.offerExpiresAt).toLocaleTimeString()}
-                    </p>
+              {bookings.map((b, i) => (
+                <div
+                  key={b.id}
+                  className="animate-[fade-up_0.4s_cubic-bezier(0.16,1,0.3,1)_both]"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <Link to={`/bookings/${b.id}`} className="block transition-transform duration-200 hover:-translate-y-0.5">
+                    <Ticket
+                      eventTitle={b.event.title}
+                      venueName={b.event.venue.name}
+                      date={b.event.date}
+                      time={b.event.startTime}
+                      seatLabels={b.seats.map((s) => s.showSeat.seat.label)}
+                      bookingRef={b.bookingRef}
+                      qrCodeData={b.qrCodeData}
+                      status={b.status}
+                    />
+                  </Link>
+                  {b.status === 'CONFIRMED' && (
                     <button
-                      onClick={() => handleCompleteOfferedBooking(w)}
-                      className="mt-1 text-sm bg-emerald-600 text-white px-3 py-1 rounded hover:bg-emerald-500"
+                      onClick={() => handleCancel(b.id)}
+                      className="mt-2 text-xs font-medium text-ruby-400 hover:text-ruby-300"
                     >
-                      Complete booking now
+                      Cancel booking
                     </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {waitlist.length > 0 && (
+              <>
+                <h2 className="mb-4 mt-12 font-display text-2xl italic text-canvas-50">Waitlist</h2>
+                <div className="space-y-3">
+                  {waitlist.map((w) => (
+                    <Card key={w.id} variant="solid" className="p-5">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-canvas-50">{w.event.title}</p>
+                          <p className="text-sm text-canvas-400">{w.category} category</p>
+                        </div>
+                        <Badge tone={w.status === 'OFFERED' ? 'amber' : 'neutral'} dot>
+                          {w.status}
+                        </Badge>
+                      </div>
+                      {w.status === 'OFFERED' && w.offerExpiresAt && (
+                        <div className="mt-3 flex items-center justify-between rounded-xl border border-amber-500/25 bg-amber-500/10 p-3">
+                          <p className="text-xs text-amber-300">
+                            A seat is yours &mdash; complete checkout by {new Date(w.offerExpiresAt).toLocaleTimeString()}
+                          </p>
+                          <Button variant="gold" size="sm" onClick={() => handleCompleteOfferedBooking(w)}>
+                            Book now
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }

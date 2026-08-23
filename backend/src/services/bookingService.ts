@@ -156,6 +156,18 @@ export async function listMyBookings(customerId: string) {
   });
 }
 
+/** Organiser/admin view: all bookings for a given event, with customer details. */
+export async function listBookingsForEvent(eventId: string) {
+  return prisma.booking.findMany({
+    where: { eventId },
+    include: {
+      customer: { select: { id: true, name: true, email: true } },
+      seats: { include: { showSeat: { include: { seat: true } } } },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
 export async function getBooking(bookingId: string, customerId: string, isAdmin = false) {
   const booking = await prisma.booking.findUnique({
     where: { id: bookingId },
