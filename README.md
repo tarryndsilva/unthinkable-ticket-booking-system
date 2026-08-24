@@ -129,16 +129,32 @@ All authenticated routes take `Authorization: Bearer <token>`.
 | `POST /api/auth/register` | — | Register (customer/organiser/admin) |
 | `POST /api/auth/login` | — | Log in, returns JWT |
 | `GET /api/auth/me` | any | Current user |
+| `PATCH /api/auth/me` | any | Update name/email/password |
 | `POST /api/venues` | ADMIN | Create venue + seat layout |
 | `GET /api/venues` | any | List venues |
 | `POST /api/events` | ORGANISER/ADMIN | Create event listing + pricing |
-| `GET /api/events` | — | Browse/filter events (`?type=MOVIE\|CONCERT`) |
+| `GET /api/events` | — | Browse/filter/search events (`?type=`, `?search=`, `?city=`) |
+| `GET /api/events/cities` | — | Distinct list of venue cities, for the city filter |
 | `GET /api/events/:id/seatmap` | — | Live seat map for an event |
 | `POST /api/events/:id/holds` | CUSTOMER | Hold one or more seats (TTL) |
 | `DELETE /api/events/:id/holds/:seatId` | CUSTOMER | Release a hold early |
-| `POST /api/events/:id/bookings` | CUSTOMER | Confirm booking from held seats → QR email |
+| `POST /api/events/:id/bookings` | CUSTOMER | Confirm booking from held seats → QR email (accepts optional `couponCode`) |
 | `POST /api/events/:id/waitlist` | CUSTOMER | Join the waitlist for a sold-out category |
 | `GET /api/events/:id/revenue` | ORGANISER/ADMIN | Booking summary & revenue |
+| `GET /api/events/:id/bookings` | ORGANISER/ADMIN | Bookings for one event, with customer details |
+| `DELETE /api/events/:eventId/bookings/:bookingId` | ORGANISER/ADMIN | Cancel a customer's booking |
+| `GET /api/events/:id/reviews` | — | Reviews + average rating for an event |
+| `POST /api/events/:id/reviews` | CUSTOMER | Leave a review (requires a confirmed booking) |
+| `POST /api/events/:id/favorite` / `DELETE .../favorite` | CUSTOMER | Add/remove from wishlist |
+| `GET /api/favorites` | CUSTOMER | My wishlisted events (full objects) |
+| `GET /api/favorites/ids` | CUSTOMER | My wishlisted event IDs only (lightweight) |
+| `POST /api/coupons/validate` | any | Check a coupon code's validity + discount |
+| `GET /api/coupons` / `POST /api/coupons` | ADMIN | List / create coupons |
+| `PATCH /api/coupons/:id/deactivate` | ADMIN | Deactivate a coupon |
+| `GET /api/admin/users` | ADMIN | List all users |
+| `PATCH /api/admin/users/:id/role` | ADMIN | Change a user's role |
+| `GET /api/admin/events` | ADMIN | All event listings, cross-organiser |
+| `DELETE /api/admin/events/:id` | ADMIN | Remove a listing (blocked if it has bookings) |
 | `GET /api/bookings` | CUSTOMER | Booking history |
 | `GET /api/bookings/waitlist/mine` | CUSTOMER | My waitlist entries |
 | `DELETE /api/bookings/:id` | CUSTOMER | Cancel a booking → triggers waitlist offer |

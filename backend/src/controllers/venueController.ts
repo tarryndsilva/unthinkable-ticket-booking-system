@@ -20,6 +20,7 @@ export async function createVenue(req: Request, res: Response) {
     data: {
       name: data.name,
       address: data.address,
+      city: data.city,
       adminId: req.user!.userId,
       seats: {
         create: data.seats.map((s) => ({

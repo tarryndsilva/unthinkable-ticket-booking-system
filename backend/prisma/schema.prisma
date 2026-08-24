@@ -50,17 +50,22 @@ model User {
   bookings      Booking[]
   waitlists     Waitlist[]
   seatHolds     SeatHold[]
+  reviews       Review[]
+  favorites     Favorite[]
 }
 
 model Venue {
   id        String   @id @default(uuid())
   name      String
   address   String
+  city      String   @default("Chennai")
   admin     User     @relation("AdminVenues", fields: [adminId], references: [id])
   adminId   String
   seats     Seat[]
   events    Event[]
   createdAt DateTime @default(now())
+
+  @@index([city])
 }
 
 // Fixed physical seat layout for a venue
@@ -94,6 +99,8 @@ model Event {
   showSeats   ShowSeat[]
   bookings    Booking[]
   waitlists   Waitlist[]
+  reviews     Review[]
+  favorites   Favorite[]
 }
 
 model EventCategoryPrice {
@@ -145,6 +152,8 @@ model Booking {
   customerId    String
   status        BookingStatus @default(CONFIRMED)
   totalAmount   Decimal       @db.Decimal(10, 2)
+  couponCode    String?
+  discountAmount Decimal?     @db.Decimal(10, 2)
   qrCodeData    String?
   seats         BookingSeat[]
   createdAt     DateTime      @default(now())
@@ -175,4 +184,41 @@ model Waitlist {
   updatedAt       DateTime       @updatedAt
 
   @@index([eventId, category, status, createdAt])
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  event      Event    @relation(fields: [eventId], references: [id])
+  eventId    String
+  customer   User     @relation(fields: [customerId], references: [id])
+  customerId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@unique([eventId, customerId])
+  @@index([eventId])
+}
+
+model Favorite {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  event     Event    @relation(fields: [eventId], references: [id])
+  eventId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, eventId])
+  @@index([userId])
+}
+
+model Coupon {
+  id             String    @id @default(uuid())
+  code           String    @unique
+  percentOff     Int
+  maxRedemptions Int?
+  timesRedeemed  Int       @default(0)
+  expiresAt      DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
 }

@@ -1,14 +1,17 @@
 import { Router } from 'express';
-import { createEvent, listEvents, getEvent, getSeatMap, eventRevenue } from '../controllers/eventController';
+import { createEvent, listEvents, listCities, getEvent, getSeatMap, eventRevenue } from '../controllers/eventController';
 import { postHoldSeats, deleteHoldSeat } from '../controllers/seatHoldController';
 import { postBooking, getBookingsForEvent, organiserCancelBooking } from '../controllers/bookingController';
 import { postJoinWaitlist } from '../controllers/waitlistController';
+import { listReviews, postReview } from '../controllers/reviewController';
+import { addFavorite, removeFavorite } from '../controllers/favoriteController';
 import { authenticate, authorize } from '../middleware/auth';
 
 const router = Router();
 
 router.post('/', authenticate, authorize('ORGANISER', 'ADMIN'), createEvent);
 router.get('/', listEvents);
+router.get('/cities', listCities);
 router.get('/:id', getEvent);
 router.get('/:id/seatmap', getSeatMap);
 router.get('/:id/revenue', authenticate, authorize('ORGANISER', 'ADMIN'), eventRevenue);
@@ -21,5 +24,11 @@ router.post('/:eventId/bookings', authenticate, authorize('CUSTOMER'), postBooki
 router.delete('/:eventId/bookings/:bookingId', authenticate, authorize('ORGANISER', 'ADMIN'), organiserCancelBooking);
 
 router.post('/:eventId/waitlist', authenticate, authorize('CUSTOMER'), postJoinWaitlist);
+
+router.get('/:id/reviews', listReviews);
+router.post('/:id/reviews', authenticate, authorize('CUSTOMER'), postReview);
+
+router.post('/:id/favorite', authenticate, addFavorite);
+router.delete('/:id/favorite', authenticate, removeFavorite);
 
 export default router;

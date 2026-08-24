@@ -15,6 +15,7 @@ export const loginSchema = z.object({
 export const venueSchema = z.object({
   name: z.string().min(2),
   address: z.string().min(2),
+  city: z.string().min(2).default('Chennai'),
   seats: z
     .array(
       z.object({
@@ -50,6 +51,7 @@ export const holdSeatsSchema = z.object({
 export const bookingSchema = z.object({
   sessionId: z.string().min(1),
   seatIds: z.array(z.string().uuid()).min(1).max(10),
+  couponCode: z.string().min(1).max(30).optional(),
 });
 
 export const waitlistJoinSchema = z.object({

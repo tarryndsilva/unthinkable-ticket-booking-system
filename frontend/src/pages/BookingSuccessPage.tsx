@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import type { Booking } from '../types';
 import { Ticket } from '../components/ui/Ticket';
 import { Button } from '../components/ui/Button';
+import { downloadCalendarInvite } from '../lib/calendar';
 
 export function BookingSuccessPage() {
   const location = useLocation();
@@ -47,7 +48,22 @@ export function BookingSuccessPage() {
           />
         </div>
 
-        <div className="mt-8 flex gap-3">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() =>
+              downloadCalendarInvite({
+                title: booking.event.title,
+                venueName: booking.event.venue.name,
+                date: booking.event.date,
+                startTime: booking.event.startTime,
+                bookingRef: booking.bookingRef,
+              })
+            }
+          >
+            Add to calendar
+          </Button>
           <Link to="/bookings">
             <Button variant="secondary" size="lg">
               View all tickets

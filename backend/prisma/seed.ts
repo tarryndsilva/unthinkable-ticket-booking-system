@@ -18,13 +18,22 @@ function makeSeats(rows: string[], seatsPerRow: number, premiumRows: string[]) {
   return seats;
 }
 
-async function ensureVenue(name: string, address: string, adminId: string, rows: string[], seatsPerRow: number, premiumRows: string[]) {
+async function ensureVenue(
+  name: string,
+  address: string,
+  city: string,
+  adminId: string,
+  rows: string[],
+  seatsPerRow: number,
+  premiumRows: string[]
+) {
   const existing = await prisma.venue.findFirst({ where: { name } });
   if (existing) return prisma.venue.findUnique({ where: { id: existing.id }, include: { seats: true } });
   return prisma.venue.create({
     data: {
       name,
       address,
+      city,
       adminId,
       seats: { create: makeSeats(rows, seatsPerRow, premiumRows) },
     },
@@ -92,7 +101,8 @@ async function main() {
 
   const cinemaHall = await ensureVenue(
     'Grand Cinema Hall',
-    '123 Main Street, Chennai',
+    '123 Main Street',
+    'Chennai',
     admin.id,
     ['A', 'B', 'C', 'D', 'E', 'F'],
     10,
@@ -101,7 +111,8 @@ async function main() {
 
   const arena = await ensureVenue(
     'Skyline Arena',
-    '88 Riverside Boulevard, Chennai',
+    '88 Riverside Boulevard',
+    'Bengaluru',
     admin.id,
     ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
     12,
@@ -110,7 +121,8 @@ async function main() {
 
   const jazzClub = await ensureVenue(
     'The Blue Room Jazz Club',
-    '17 Harbor Lane, Chennai',
+    '17 Harbor Lane',
+    'Mumbai',
     admin.id,
     ['A', 'B', 'C', 'D'],
     8,
@@ -135,9 +147,21 @@ async function main() {
     await ensureEvent('Late Night Sax & Soul', 'CONCERT', jazzClub, organiser.id, 9, '21:30', 42, 26);
   }
 
+  await prisma.coupon.upsert({
+    where: { code: 'WELCOME20' },
+    update: {},
+    create: { code: 'WELCOME20', percentOff: 20, maxRedemptions: 100 },
+  });
+  await prisma.coupon.upsert({
+    where: { code: 'FLASH10' },
+    update: {},
+    create: { code: 'FLASH10', percentOff: 10 },
+  });
+
   console.log('\nSeed complete.');
   console.log('Login: admin@example.com / organiser@example.com / customer@example.com');
   console.log('Password: password123');
+  console.log('Try coupon codes WELCOME20 (20% off) or FLASH10 (10% off) at checkout.');
 }
 
 main()

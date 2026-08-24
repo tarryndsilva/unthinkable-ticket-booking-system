@@ -41,7 +41,7 @@ export async function createEvent(req: Request, res: Response) {
 }
 
 export async function listEvents(req: Request, res: Response) {
-  const { type, from, to } = req.query;
+  const { type, from, to, search, city } = req.query;
   const events = await prisma.event.findMany({
     where: {
       type: type ? (type as any) : undefined,
@@ -49,11 +49,29 @@ export async function listEvents(req: Request, res: Response) {
         gte: from ? new Date(from as string) : undefined,
         lte: to ? new Date(to as string) : undefined,
       },
+      title: search ? { contains: search as string, mode: 'insensitive' } : undefined,
+      venue: city ? { city: { equals: city as string, mode: 'insensitive' } } : undefined,
     },
-    include: { venue: true, pricing: true },
+    include: {
+      venue: true,
+      pricing: true,
+      reviews: { select: { rating: true } },
+    },
     orderBy: { date: 'asc' },
   });
-  res.json(events);
+
+  const withRatings = events.map((e) => {
+    const { reviews, ...rest } = e;
+    const avgRating = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : null;
+    return { ...rest, avgRating, reviewCount: reviews.length };
+  });
+
+  res.json(withRatings);
+}
+
+export async function listCities(_req: Request, res: Response) {
+  const venues = await prisma.venue.findMany({ select: { city: true }, distinct: ['city'] });
+  res.json(venues.map((v) => v.city).sort());
 }
 
 export async function getEvent(req: Request, res: Response) {

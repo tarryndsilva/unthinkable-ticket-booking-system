@@ -9,6 +9,8 @@ import venueRoutes from './routes/venueRoutes';
 import eventRoutes from './routes/eventRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import adminRoutes from './routes/adminRoutes';
+import favoriteRoutes from './routes/favoriteRoutes';
+import couponRoutes from './routes/couponRoutes';
 import { errorHandler } from './middleware/errorHandler';
 
 export function createApp() {
@@ -28,6 +30,8 @@ export function createApp() {
   app.use('/api/events', eventRoutes);
   app.use('/api/bookings', bookingRoutes);
   app.use('/api/admin', adminRoutes);
+  app.use('/api/favorites', favoriteRoutes);
+  app.use('/api/coupons', couponRoutes);
 
   app.use((req, res) => res.status(404).json({ error: 'Not found' }));
   app.use(errorHandler);

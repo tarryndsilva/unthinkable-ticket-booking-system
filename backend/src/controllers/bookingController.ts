@@ -7,7 +7,7 @@ import { AppError } from '../middleware/errorHandler';
 export async function postBooking(req: Request, res: Response) {
   const data = bookingSchema.parse(req.body);
   const eventId = req.params.eventId;
-  const booking = await confirmBooking(eventId, data.seatIds, data.sessionId, req.user!.userId);
+  const booking = await confirmBooking(eventId, data.seatIds, data.sessionId, req.user!.userId, data.couponCode);
   res.status(201).json(booking);
 }
 

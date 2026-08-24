@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, apiErrorMessage } from '../api/client';
-import type { Venue, AdminUser, ModerationEvent, Role } from '../types';
+import type { Venue, AdminUser, ModerationEvent, Role, Coupon } from '../types';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -14,7 +14,7 @@ interface RowConfig {
   category: string;
 }
 
-type Tab = 'venues' | 'users' | 'moderation';
+type Tab = 'venues' | 'users' | 'moderation' | 'coupons';
 
 export function AdminPage() {
   const [tab, setTab] = useState<Tab>('venues');
@@ -26,7 +26,7 @@ export function AdminPage() {
         <p className="mt-1 text-sm text-canvas-400">Manage venues, users, and event listings platform-wide.</p>
 
         <div className="mt-6 flex w-fit gap-1 rounded-full border border-canvas-700 bg-canvas-900 p-1">
-          {(['venues', 'users', 'moderation'] as Tab[]).map((t) => (
+          {(['venues', 'users', 'moderation', 'coupons'] as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -43,6 +43,7 @@ export function AdminPage() {
           {tab === 'venues' && <VenuesPanel />}
           {tab === 'users' && <UsersPanel />}
           {tab === 'moderation' && <ModerationPanel />}
+          {tab === 'coupons' && <CouponsPanel />}
         </div>
       </div>
     </div>
@@ -55,6 +56,7 @@ function VenuesPanel() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [city, setCity] = useState('Chennai');
   const [rows, setRows] = useState<RowConfig[]>([{ row: 'A', seatsPerRow: 8, category: 'Premium' }]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -89,10 +91,11 @@ function VenuesPanel() {
       const seats = rows.flatMap((r) =>
         Array.from({ length: r.seatsPerRow }, (_, i) => ({ row: r.row, column: i + 1, category: r.category }))
       );
-      const res = await api.post('/api/venues', { name, address, seats });
+      const res = await api.post('/api/venues', { name, address, city, seats });
       setVenues((prev) => [...prev, res.data]);
       setName('');
       setAddress('');
+      setCity('Chennai');
       setRows([{ row: 'A', seatsPerRow: 8, category: 'Premium' }]);
       setShowForm(false);
     } catch (err) {
@@ -119,8 +122,9 @@ function VenuesPanel() {
           <form onSubmit={handleCreateVenue} className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Input label="Venue name" placeholder="Grand Cinema Hall" value={name} onChange={(e) => setName(e.target.value)} required />
-              <Input label="Address" placeholder="123 Main Street" value={address} onChange={(e) => setAddress(e.target.value)} required />
+              <Input label="City" placeholder="Chennai" value={city} onChange={(e) => setCity(e.target.value)} required />
             </div>
+            <Input label="Address" placeholder="123 Main Street" value={address} onChange={(e) => setAddress(e.target.value)} required />
 
             <div>
               <div className="mb-2 flex items-center justify-between">
@@ -186,7 +190,7 @@ function VenuesPanel() {
           {venues.map((v) => (
             <Card key={v.id} variant="solid" className="p-5">
               <p className="font-medium text-canvas-50">{v.name}</p>
-              <p className="mt-0.5 text-sm text-canvas-400">{v.address}</p>
+              <p className="mt-0.5 text-sm text-canvas-400">{v.address}{v.city ? ` \u00b7 ${v.city}` : ''}</p>
             </Card>
           ))}
         </div>
@@ -345,6 +349,123 @@ function ModerationPanel() {
         })}
       </div>
       )}
+    </>
+  );
+}
+
+// ===================== Coupons =====================
+
+function CouponsPanel() {
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [code, setCode] = useState('');
+  const [percentOff, setPercentOff] = useState('10');
+  const [maxRedemptions, setMaxRedemptions] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+
+  function refresh() {
+    api.get('/api/coupons').then((res) => setCoupons(res.data));
+  }
+
+  useEffect(refresh, []);
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setBusy(true);
+    try {
+      await api.post('/api/coupons', {
+        code,
+        percentOff: Number(percentOff),
+        maxRedemptions: maxRedemptions ? Number(maxRedemptions) : undefined,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      });
+      setCode('');
+      setPercentOff('10');
+      setMaxRedemptions('');
+      setExpiresAt('');
+      setShowForm(false);
+      refresh();
+    } catch (err) {
+      setError(apiErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDeactivate(id: string) {
+    await api.patch(`/api/coupons/${id}/deactivate`);
+    refresh();
+  }
+
+  return (
+    <>
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="font-semibold text-canvas-100">Coupons</h2>
+        <Button variant="primary" size="sm" onClick={() => setShowForm((s) => !s)}>
+          {showForm ? 'Close' : '+ New coupon'}
+        </Button>
+      </div>
+
+      {showForm && (
+        <Card variant="glass" glow="brand" className="mb-8 animate-[fade-up_0.3s_ease-out] p-6">
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Code" placeholder="SAVE20" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} required />
+              <Input
+                label="% off"
+                type="number"
+                min="1"
+                max="90"
+                value={percentOff}
+                onChange={(e) => setPercentOff(e.target.value)}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Max redemptions (optional)"
+                type="number"
+                min="1"
+                placeholder="Unlimited"
+                value={maxRedemptions}
+                onChange={(e) => setMaxRedemptions(e.target.value)}
+              />
+              <Input label="Expires (optional)" type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+            </div>
+            {error && <p className="text-sm text-ruby-400">{error}</p>}
+            <Button type="submit" variant="primary" loading={busy}>
+              Create coupon
+            </Button>
+          </form>
+        </Card>
+      )}
+
+      <div className="space-y-3">
+        {coupons.length === 0 && <p className="text-sm text-canvas-400">No coupons yet.</p>}
+        {coupons.map((c) => (
+          <Card key={c.id} variant="solid" className="flex items-center justify-between p-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="font-mono text-sm font-semibold text-canvas-50">{c.code}</p>
+                <Badge tone={c.active ? 'emerald' : 'neutral'}>{c.active ? 'Active' : 'Inactive'}</Badge>
+              </div>
+              <p className="mt-0.5 text-xs text-canvas-400">
+                {c.percentOff}% off &middot; used {c.timesRedeemed}
+                {c.maxRedemptions ? `/${c.maxRedemptions}` : ''}
+                {c.expiresAt ? ` \u00b7 expires ${new Date(c.expiresAt).toLocaleDateString()}` : ''}
+              </p>
+            </div>
+            {c.active && (
+              <button onClick={() => handleDeactivate(c.id)} className="text-xs font-medium text-ruby-400 hover:text-ruby-300">
+                Deactivate
+              </button>
+            )}
+          </Card>
+        ))}
+      </div>
     </>
   );
 }

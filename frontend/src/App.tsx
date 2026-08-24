@@ -12,6 +12,8 @@ import { TicketPage } from './pages/TicketPage';
 import { MyBookingsPage } from './pages/MyBookingsPage';
 import { OrganiserPage } from './pages/OrganiserPage';
 import { AdminPage } from './pages/AdminPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { WishlistPage } from './pages/WishlistPage';
 
 export default function App() {
   return (
@@ -69,6 +71,22 @@ export default function App() {
               element={
                 <ProtectedRoute roles={['ADMIN']}>
                   <AdminPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/wishlist"
+              element={
+                <ProtectedRoute roles={['CUSTOMER']}>
+                  <WishlistPage />
                 </ProtectedRoute>
               }
             />

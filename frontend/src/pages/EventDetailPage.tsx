@@ -8,6 +8,9 @@ import { Seat, SeatLegendSwatch } from '../components/ui/Seat';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Card } from '../components/ui/Card';
+import { RatingStars } from '../components/ui/RatingStars';
+import { FavoriteButton } from '../components/ui/FavoriteButton';
+import { ReviewsSection } from '../components/ReviewsSection';
 
 const SESSION_KEY = 'booking_session_id';
 function getSessionId() {
@@ -29,8 +32,8 @@ export function EventDetailPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [holdExpiresAt, setHoldExpiresAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [sheetExpanded, setSheetExpanded] = useState(false);
@@ -47,6 +50,12 @@ export function EventDetailPage() {
     if (!id) return;
     api.get(`/api/events/${id}`).then((res) => setEvent(res.data));
     refreshSeatMap();
+    if (user) {
+      api
+        .get('/api/favorites/ids')
+        .then((res) => setIsFavorited((res.data as string[]).includes(id)))
+        .catch(() => {});
+    }
 
     const socket = io(import.meta.env.VITE_API_URL || 'http://localhost:4000');
     socketRef.current = socket;
@@ -74,6 +83,18 @@ export function EventDetailPage() {
   function refreshSeatMap() {
     if (!id) return;
     api.get(`/api/events/${id}/seatmap`).then((res) => setSeatMap(res.data));
+  }
+
+  async function toggleFavorite() {
+    if (!user || !id) return navigate('/login');
+    const next = !isFavorited;
+    setIsFavorited(next);
+    try {
+      if (next) await api.post(`/api/events/${id}/favorite`);
+      else await api.delete(`/api/events/${id}/favorite`);
+    } catch {
+      setIsFavorited(!next);
+    }
   }
 
   function toggleSeat(seat: SeatMapEntry) {
@@ -131,39 +152,10 @@ export function EventDetailPage() {
     setPan({ x: 0, y: 0 });
   }
 
-  function buildCheckoutState(expiry: Date, seats: string[]) {
-    if (!event || !id) return null;
-
-    const seatDetails = seats.map((seatId) => {
-      const seat = seatMap.find((s) => s.seatId === seatId);
-      if (!seat) return null;
-      return {
-        seatId,
-        label: seat.label,
-        category: seat.category,
-        price: priceByCategory.get(seat.category) || 0,
-      };
-    }).filter(Boolean) as { seatId: string; label: string; category: string; price: number }[];
-
-    if (seatDetails.length === 0) return null;
-
-    return {
-      eventId: id,
-      eventTitle: event.title,
-      venueName: event.venue.name,
-      date: event.date,
-      startTime: event.startTime,
-      sessionId,
-      seats: seatDetails,
-      holdExpiresAt: expiry.toISOString(),
-    };
-  }
-
   async function handleHold() {
     if (!user) return navigate('/login');
     if (selected.size === 0) return;
     setError('');
-    setNotice('');
     setBusy(true);
     try {
       const res = await api.post(`/api/events/${id}/holds`, {
@@ -171,18 +163,7 @@ export function EventDetailPage() {
         sessionId,
       });
       const expiries = res.data.holds.map((h: any) => new Date(h.expiresAt).getTime());
-      const nextExpiry = new Date(Math.min(...expiries));
-      setHoldExpiresAt(nextExpiry);
-
-      const checkoutState = buildCheckoutState(nextExpiry, Array.from(selected));
-      if (!checkoutState) {
-        throw new Error('Your selected seats are no longer available.');
-      }
-
-      setNotice('Seats held successfully. Taking you to checkout...');
-      window.setTimeout(() => {
-        navigate('/checkout', { state: checkoutState });
-      }, 500);
+      setHoldExpiresAt(new Date(Math.min(...expiries)));
     } catch (err) {
       setError(apiErrorMessage(err));
       refreshSeatMap();
@@ -194,9 +175,22 @@ export function EventDetailPage() {
 
   function goToCheckout() {
     if (!holdExpiresAt || !event) return;
-    const checkoutState = buildCheckoutState(holdExpiresAt, Array.from(selected));
-    if (!checkoutState) return;
-    navigate('/checkout', { state: checkoutState });
+    const seatDetails = Array.from(selected).map((seatId) => {
+      const seat = seatMap.find((s) => s.seatId === seatId)!;
+      return { seatId, label: seat.label, category: seat.category, price: priceByCategory.get(seat.category) || 0 };
+    });
+    navigate('/checkout', {
+      state: {
+        eventId: id,
+        eventTitle: event.title,
+        venueName: event.venue.name,
+        date: event.date,
+        startTime: event.startTime,
+        sessionId,
+        seats: seatDetails,
+        holdExpiresAt: holdExpiresAt.toISOString(),
+      },
+    });
   }
 
   async function handleJoinWaitlist(category: string) {
@@ -241,13 +235,21 @@ export function EventDetailPage() {
       <div className="relative overflow-hidden border-b border-canvas-800 bg-gradient-to-b from-canvas-900 via-canvas-950 to-canvas-950 px-6 py-10">
         <div className="pointer-events-none absolute -top-32 left-1/2 h-64 w-[600px] -translate-x-1/2 rounded-full bg-brand-600/20 blur-[100px]" />
         <div className="relative mx-auto max-w-6xl">
-          <Badge tone="brand" dot>
-            {event.type === 'MOVIE' ? 'Now showing' : 'Live event'}
-          </Badge>
-          <h1 className="mt-3 font-display text-4xl italic text-canvas-50 sm:text-5xl">{event.title}</h1>
-          <p className="mt-2 text-canvas-300">
-            {event.venue.name} &middot; {new Date(event.date).toDateString()} &middot; {event.startTime}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3">
+                <Badge tone="brand" dot>
+                  {event.type === 'MOVIE' ? 'Now showing' : 'Live event'}
+                </Badge>
+                <RatingStars rating={event.avgRating} count={event.reviewCount} size="md" />
+              </div>
+              <h1 className="mt-3 font-display text-4xl italic text-canvas-50 sm:text-5xl">{event.title}</h1>
+              <p className="mt-2 text-canvas-300">
+                {event.venue.name} &middot; {new Date(event.date).toDateString()} &middot; {event.startTime}
+              </p>
+            </div>
+            {user && <FavoriteButton active={isFavorited} onToggle={toggleFavorite} />}
+          </div>
         </div>
       </div>
 
@@ -368,7 +370,6 @@ export function EventDetailPage() {
             )}
 
             {error && <p className="mt-4 text-sm text-ruby-400">{error}</p>}
-            {notice && <p className="mt-4 text-sm text-emerald-400">{notice}</p>}
           </Card>
 
           {/* ===== Floating booking summary (desktop) ===== */}
@@ -435,6 +436,11 @@ export function EventDetailPage() {
               </div>
             </Card>
           </div>
+        </div>
+
+        {/* ===== Reviews ===== */}
+        <div className="mt-12">
+          <ReviewsSection eventId={id!} />
         </div>
       </div>
 

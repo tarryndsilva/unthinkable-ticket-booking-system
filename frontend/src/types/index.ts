@@ -11,6 +11,7 @@ export interface Venue {
   id: string;
   name: string;
   address: string;
+  city?: string;
   seats?: Seat[];
 }
 
@@ -35,6 +36,8 @@ export interface EventItem {
   startTime: string;
   venue: Venue;
   pricing: EventPricing[];
+  avgRating?: number | null;
+  reviewCount?: number;
 }
 
 export type SeatStatus = 'AVAILABLE' | 'HELD' | 'BOOKED';
@@ -86,8 +89,29 @@ export interface Booking {
   qrCodeData: string | null;
   createdAt: string;
   totalAmount: string | number;
+  couponCode?: string | null;
+  discountAmount?: string | number | null;
   event: EventItem;
   seats: { category: string; price: string | number; showSeat: { seat: Seat } }[];
+}
+
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  customer: { id: string; name: string };
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  percentOff: number;
+  maxRedemptions: number | null;
+  timesRedeemed: number;
+  expiresAt: string | null;
+  active: boolean;
+  createdAt: string;
 }
 
 export interface WaitlistEntry {

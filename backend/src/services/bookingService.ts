@@ -15,7 +15,13 @@ import { offerSeatToNextInWaitlist, fulfillWaitlistOffer } from './waitlistServi
  * this customer/session — the hold step already applied the concurrency
  * protection, so this step just does an atomic HELD -> BOOKED transition.
  */
-export async function confirmBooking(eventId: string, seatIds: string[], sessionId: string, customerId: string) {
+export async function confirmBooking(
+  eventId: string,
+  seatIds: string[],
+  sessionId: string,
+  customerId: string,
+  couponCode?: string
+) {
   const event = await prisma.event.findUnique({ where: { id: eventId }, include: { pricing: true } });
   if (!event) throw new AppError('Event not found', 404);
 
@@ -47,7 +53,21 @@ export async function confirmBooking(eventId: string, seatIds: string[], session
   }
 
   const bookingRef = generateBookingRef();
-  const totalAmount = showSeats.reduce((sum, ss) => sum + priceByCategory.get(ss.seat.category)!, 0);
+  const subtotal = showSeats.reduce((sum, ss) => sum + priceByCategory.get(ss.seat.category)!, 0);
+
+  let discountAmount = 0;
+  let appliedCouponCode: string | undefined;
+  if (couponCode) {
+    const coupon = await prisma.coupon.findUnique({ where: { code: couponCode.toUpperCase() } });
+    if (!coupon || !coupon.active) throw new AppError('Invalid coupon code', 400);
+    if (coupon.expiresAt && coupon.expiresAt.getTime() < Date.now()) throw new AppError('This coupon has expired', 400);
+    if (coupon.maxRedemptions && coupon.timesRedeemed >= coupon.maxRedemptions) {
+      throw new AppError('This coupon has reached its redemption limit', 400);
+    }
+    discountAmount = Math.round(subtotal * (coupon.percentOff / 100) * 100) / 100;
+    appliedCouponCode = coupon.code;
+  }
+  const totalAmount = Math.max(0, subtotal - discountAmount);
 
   const booking = await prisma.$transaction(async (tx) => {
     // Atomic CAS: HELD -> BOOKED, only succeeds for seats still HELD
@@ -64,12 +84,24 @@ export async function confirmBooking(eventId: string, seatIds: string[], session
     // Remove hold records since the seat is now booked, not held
     await tx.seatHold.deleteMany({ where: { showSeatId: { in: showSeats.map((s) => s.id) } } });
 
+    if (appliedCouponCode) {
+      // Re-check + increment atomically inside the transaction to close the
+      // race window between the earlier validation read and this write.
+      const fresh = await tx.coupon.findUnique({ where: { code: appliedCouponCode } });
+      if (!fresh || !fresh.active || (fresh.maxRedemptions && fresh.timesRedeemed >= fresh.maxRedemptions)) {
+        throw new AppError('This coupon just reached its redemption limit, please retry without it', 409);
+      }
+      await tx.coupon.update({ where: { code: appliedCouponCode }, data: { timesRedeemed: { increment: 1 } } });
+    }
+
     const created = await tx.booking.create({
       data: {
         bookingRef,
         eventId,
         customerId,
         totalAmount,
+        couponCode: appliedCouponCode,
+        discountAmount: appliedCouponCode ? discountAmount : undefined,
         seats: {
           create: showSeats.map((ss) => ({
             showSeatId: ss.id,
@@ -95,19 +127,30 @@ export async function confirmBooking(eventId: string, seatIds: string[], session
     showSeats.map((ss) => ({ showSeatId: ss.id, status: 'BOOKED', heldUntil: null }))
   );
 
-  await sendConfirmationEmail(booking);
+  // Email/QR generation must never fail the booking itself — the booking is
+  // already committed at this point. If this throws (bad SMTP creds, a
+  // transient network blip, etc.), log it and still return success to the
+  // customer; the QR is regenerable and the email can be resent later.
+  let qrCodeData: string | null = null;
+  try {
+    qrCodeData = await sendConfirmationEmail(booking);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('[booking] confirmation email/QR generation failed (booking still succeeded):', err);
+  }
 
-  return booking;
+  return { ...booking, qrCodeData };
 }
 
-async function sendConfirmationEmail(booking: any) {
+async function sendConfirmationEmail(booking: any): Promise<string> {
   const customer = await prisma.user.findUnique({ where: { id: booking.customerId } });
-  if (!customer) return;
 
   const qrDataUrl = await generateQrCodeDataUrl(booking.bookingRef);
   const qrBuffer = await generateQrCodeBuffer(booking.bookingRef);
 
   await prisma.booking.update({ where: { id: booking.id }, data: { qrCodeData: qrDataUrl } });
+
+  if (!customer) return qrDataUrl;
 
   const seatLabels = booking.seats.map((s: any) => s.showSeat.seat.label).join(', ');
 
@@ -124,6 +167,8 @@ async function sendConfirmationEmail(booking: any) {
      <p>Your QR ticket is attached. Present it at entry.</p>`,
     [{ filename: `ticket-${booking.bookingRef}.png`, content: qrBuffer, cid: 'qrcode' }]
   );
+
+  return qrDataUrl;
 }
 
 export async function cancelBooking(bookingId: string, customerId: string, isAdmin = false) {

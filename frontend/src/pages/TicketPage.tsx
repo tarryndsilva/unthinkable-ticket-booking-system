@@ -5,11 +5,13 @@ import type { Booking } from '../types';
 import { Ticket } from '../components/ui/Ticket';
 import { Button } from '../components/ui/Button';
 import { posterGradient } from '../lib/poster';
+import { downloadCalendarInvite } from '../lib/calendar';
 
 export function TicketPage() {
   const { id } = useParams<{ id: string }>();
   const [booking, setBooking] = useState<Booking | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -18,6 +20,12 @@ export function TicketPage() {
       .then((res) => setBooking(res.data))
       .catch(() => setNotFound(true));
   }, [id]);
+
+  async function handleCopyLink() {
+    await navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   if (notFound) {
     return (
@@ -78,6 +86,29 @@ export function TicketPage() {
           <p className="mt-6 text-center text-xs text-canvas-500">
             Present the QR code at entry. Screenshot this page or check your email for a copy.
           </p>
+
+          {booking.status === 'CONFIRMED' && (
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() =>
+                  downloadCalendarInvite({
+                    title: booking.event.title,
+                    venueName: booking.event.venue.name,
+                    date: booking.event.date,
+                    startTime: booking.event.startTime,
+                    bookingRef: booking.bookingRef,
+                  })
+                }
+              >
+                Add to calendar
+              </Button>
+              <Button variant="secondary" size="sm" onClick={handleCopyLink}>
+                {copied ? 'Link copied!' : 'Copy ticket link'}
+              </Button>
+            </div>
+          )}
 
           <Link to="/bookings" className="mt-6">
             <Button variant="secondary">Back to my tickets</Button>

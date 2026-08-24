@@ -5,6 +5,7 @@ import { apiErrorMessage } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { Logo } from '../components/ui/Logo';
 
 const ROLES = [
   { v: 'CUSTOMER', label: 'Customer', hint: 'Browse & book seats' },
@@ -40,9 +41,7 @@ export function RegisterPage() {
     <div className="relative flex min-h-[calc(100vh-64px)] items-center justify-center overflow-hidden bg-canvas-950 px-6 py-12">
       <div className="pointer-events-none absolute -top-24 left-1/2 h-96 w-[700px] -translate-x-1/2 rounded-full bg-violet-600/20 blur-[120px]" />
       <Card variant="glass" glow="brand" className="relative w-full max-w-sm animate-[scale-in_0.2s_cubic-bezier(0.16,1,0.3,1)] p-8">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-electric-500 text-base font-bold text-white shadow-[var(--shadow-glow-brand)]">
-          T
-        </span>
+        <Logo size={40} />
         <h1 className="mt-5 font-display text-2xl italic text-canvas-50">Create your account</h1>
         <p className="mt-1 text-sm text-canvas-400">Start booking in seconds.</p>
 
